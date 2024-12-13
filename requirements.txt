@@ -1,0 +1,10 @@
+fastapi==0.95.2
+uvicorn==0.22.0
+pydantic==1.10.7
+speechrecognition==3.8.1
+pyaudio==0.2.13
+wave
+numpy==1.23.5
+pydub==0.25.1
+requests==2.31.0
+streamlit==1.25.0
