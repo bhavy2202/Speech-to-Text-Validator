@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
-import pyaudio
-import wave
+import sounddevice as sd
+import soundfile as sf
 import numpy as np
 import io
 from pydub import AudioSegment
@@ -15,58 +15,40 @@ import time
 API_URL = "http://127.0.0.1:8000/check-speech/"
 
 class AudioRecorder:
-    def __init__(self, chunk=1024, format=pyaudio.paInt16, channels=1, rate=44100):
-        self.chunk = chunk
-        self.format = format
+    def __init__(self, channels=1, rate=44100, chunk_duration=0.1):
         self.channels = channels
         self.rate = rate
+        self.chunk_duration = chunk_duration
         self.frames = []
-        self.p = None
-        self.stream = None
-        self.device_index = None
         self.is_recording = False
         self.recording_thread = None
 
     def _record_audio(self):
         """Internal method to record audio in a thread"""
         try:
-            # Initialize PyAudio
-            self.p = pyaudio.PyAudio()
+            # Calculate chunk size based on rate and duration
+            chunk_size = int(self.rate * self.chunk_duration)
+            
+            def audio_callback(indata, frames, time, status):
+                """Callback to store audio data"""
+                if status:
+                    print(f"Recording status: {status}")
+                self.frames.append(indata.copy())
 
-            # Attempt to find a default input device
-            default_input_device = self.p.get_default_input_device_info()
-            self.device_index = default_input_device['index']
-
-            # Open stream with more detailed configuration
-            self.stream = self.p.open(
-                format=self.format,
-                channels=self.channels,
-                rate=self.rate,
-                input=True,
-                input_device_index=self.device_index,
-                frames_per_buffer=self.chunk
-            )
-
-            self.frames = []  # Reset frames
-            while self.is_recording:
-                try:
-                    data = self.stream.read(self.chunk)
-                    self.frames.append(data)
-                except IOError as e:
-                    print(f"Input overflow, dropping frame: {e}")
-                
-                time.sleep(0.01)  # Prevent tight looping
+            # Start the stream
+            with sd.InputStream(
+                samplerate=self.rate, 
+                channels=self.channels, 
+                callback=audio_callback,
+                dtype='int16'
+            ):
+                # Continue recording while is_recording is True
+                while self.is_recording:
+                    time.sleep(self.chunk_duration)
         
         except Exception as e:
             print(f"Recording error: {e}")
             traceback.print_exc()
-        finally:
-            # Clean up resources
-            if self.stream:
-                self.stream.stop_stream()
-                self.stream.close()
-            if self.p:
-                self.p.terminate()
 
     def start_recording(self):
         """Start recording in a separate thread"""
@@ -103,14 +85,12 @@ class AudioRecorder:
             # Ensure temp directory exists
             os.makedirs('temp', exist_ok=True)
             
+            # Concatenate frames
+            audio_data = np.concatenate(self.frames, axis=0)
+            
             # Save to wave file
             wav_path = "temp/temp_recording.wav"
-            wf = wave.open(wav_path, 'wb')
-            wf.setnchannels(self.channels)
-            wf.setsampwidth(self.p.get_sample_size(self.format))
-            wf.setframerate(self.rate)
-            wf.writeframes(b''.join(self.frames))
-            wf.close()
+            sf.write(wav_path, audio_data, self.rate)
             
             # Verify file exists and has content
             if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
@@ -274,4 +254,5 @@ def main():
     )
 
 if __name__ == "__main__":
+    main()== "__main__":
     main()
