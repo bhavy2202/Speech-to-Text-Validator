@@ -1,7 +1,13 @@
-from fastapi import FastAPI, UploadFile, Form
+import os
+import io
+import sounddevice as sd
+import soundfile as sf
+import numpy as np
+import speech_recognition as sr
+from fastapi import FastAPI, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import speech_recognition as sr
+from typing import Optional
 
 app = FastAPI()
 
@@ -17,28 +23,48 @@ app.add_middleware(
 class TextCheckResponse(BaseModel):
     match: bool
     recognized_text: str
-    error: str = None
+    error: Optional[str] = None
 
 @app.post("/check-speech/", response_model=TextCheckResponse)
 async def check_speech(audio: UploadFile, text: str = Form(...), language: str = Form(...)):
     try:
-        recognizer = sr.Recognizer()
+        # Read the uploaded file
+        audio_content = await audio.read()
         
-        # Save uploaded file temporarily
-        with open("temp_audio.wav", "wb") as f:
-            f.write(await audio.read())
-
-        # Load the saved file
-        with sr.AudioFile("temp_audio.wav") as source:
-            audio_data = recognizer.record(source)
-
-        # Transcribe the audio
-        language_code = "en-US" if language == "English" else "hi-IN"
-        recognized_text = recognizer.recognize_google(audio_data, language=language_code)
-
-        # Compare the transcribed text with the provided text
-        match = recognized_text.strip().lower() == text.strip().lower()
-        return TextCheckResponse(match=match, recognized_text=recognized_text)
-
+        # Create a temporary file to store the audio
+        temp_audio_path = "temp_audio.wav"
+        
+        try:
+            # Write audio content to a temporary file
+            with open(temp_audio_path, "wb") as f:
+                f.write(audio_content)
+            
+            # Initialize recognizer
+            recognizer = sr.Recognizer()
+            
+            # Load the saved file
+            with sr.AudioFile(temp_audio_path) as source:
+                audio_data = recognizer.record(source)
+            
+            # Determine language code
+            language_code = "en-US" if language == "English" else "hi-IN"
+            
+            # Transcribe the audio
+            recognized_text = recognizer.recognize_google(audio_data, language=language_code)
+            
+            # Compare the transcribed text with the provided text
+            match = recognized_text.strip().lower() == text.strip().lower()
+            
+            return TextCheckResponse(match=match, recognized_text=recognized_text)
+        
+        except Exception as e:
+            return TextCheckResponse(match=False, recognized_text="", error=str(e))
+        
+        finally:
+            # Ensure temporary file is always deleted
+            if os.path.exists(temp_audio_path):
+                os.unlink(temp_audio_path)
+    
     except Exception as e:
-        return TextCheckResponse(match=False, recognized_text="", error=str(e))
+        # Handle any unexpected errors
+        raise HTTPException(status_code=500, detail=str(e))
