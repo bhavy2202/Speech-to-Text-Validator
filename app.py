@@ -26,6 +26,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add this at the top of your existing code, after the other imports
+@app.get("/")
+def read_root():
+    return {"status": "Speech-to-Text Validator API is running"}
+
+
 class TextCheckResponse(BaseModel):
     match: bool
     recognized_text: str
