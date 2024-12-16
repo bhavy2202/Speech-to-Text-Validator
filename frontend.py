@@ -12,7 +12,7 @@ import threading
 import time
 
 # Backend API URL
-API_URL = "http://127.0.0.1:8000/check-speech/"
+API_URL = "http://3.92.199.232:8000/check-speech/"
 
 class AudioRecorder:
     def __init__(self, channels=1, rate=44100, chunk_duration=0.1):
