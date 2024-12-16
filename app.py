@@ -9,11 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-# Add this at the top of your existing code, after the other imports
-@app.get("/")
-def read_root():
-    return {"status": "Speech-to-Text Validator API is running"}
-
 
 app = FastAPI()
 
